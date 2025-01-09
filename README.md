@@ -17,8 +17,8 @@ Installation:
 
 1.  Clone the repository:
     
-        git clone https://github.com/yourusername/Hammer-Sickle-OS.git
-        cd Hammer-Sickle-OS
+        git clone https://github.com/yourusername/Hammer-And-Sickle-OS.git
+        cd Hammer-And-Sickle-OS
     
 2.  Install dependencies:
     *   **NASM**: You will need NASM (Netwide Assembler) to assemble the bootloader and kernel.
