@@ -5,7 +5,7 @@
 
 ; stage1.asm - Simple Stage 1 bootloader for Hammer & Sickle OS
 ; This bootloader prints a random sentence from a list, waits for 10 seconds, then loads stage2.
-
+ 
 [BITS 16]               ; 16-bit mode
 [ORG 0x7C00]            ; Bootloader loads at 0x7C00
 

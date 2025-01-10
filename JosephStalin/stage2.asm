@@ -8,7 +8,7 @@ start:
     ; Set up the CPU for 32-bit protected mode
     cli                      ; Disable interrupts
     mov ax, 0x0001           ; Load selector for protected mode
-    mov ds, ax
+    mov ds, ax 
     mov es, ax
     mov fs, ax
     mov gs, ax
