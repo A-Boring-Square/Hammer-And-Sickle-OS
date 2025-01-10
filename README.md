@@ -1,7 +1,7 @@
 Hammer & Sickle OS
 ==================
 
-**Hammer & Sickle OS** is a parody operating system inspired by the themes of the Soviet Union, developed entirely in **assembly language**. This humorous and low-level operating system features a custom bootloader (`JosephStalin`), a kernel called `The KGB`, and a FAT32-based filesystem. The project provides a deep dive into system programming with a lighthearted take on Soviet themes.
+**Hammer & Sickle OS** is a parody operating system inspired by the themes of the Soviet Union, developed entirely in **assembly language**. This humorous and low-level operating system features a custom bootloader (`JosephStalin`), a kernel called `The KGB`, and a EXT4 filesystem. The project provides a deep dive into system programming with a lighthearted take on Soviet themes.
 
 Features:
 ---------
