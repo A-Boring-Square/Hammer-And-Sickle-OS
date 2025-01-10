@@ -1,166 +1,108 @@
 import os
 import subprocess
-import sys
-import platform
-from struct import pack
 import shutil
+import platform
 
-def get_nasm_command():
-    """Returns the NASM command based on the OS."""
-    if platform.system() == "Windows":
-        return "nasm"
-    elif platform.system() == "Darwin":  # macOS
-        return "nasm"
-    else:  # Assuming Linux
-        return "nasm"
+# Directories for the bootloaders and kernel
+staging_dir = 'build_temp'
 
-def create_directories():
-    """Creates the necessary directories for build output."""
-    if not os.path.exists("build"):
-        os.makedirs("build")
-        print("Created 'build' directory.")
+# Directories for the bootloaders and kernel
+bootloader_dir = 'JosephStalin'
+kernel_dir = 'KGB'
 
-def assemble_source(source, output):
-    """Assembles the source file using NASM."""
-    nasm_command = get_nasm_command()
-    command = [nasm_command, "-f", "bin", "-o", output, source]
+# Define file names for the bootloaders
+stage1_file = os.path.join(bootloader_dir, 'stage1.asm')
+stage2_file = os.path.join(bootloader_dir, 'stage2.asm')
+kernel_file = os.path.join(kernel_dir, 'entry.asm')
 
-    print(f"Assembling {source}...")
-    try:
-        subprocess.run(command, check=True)
-        print(f"Successfully assembled {source} into {output}.")
-    except subprocess.CalledProcessError as e:
-        print(f"Error during assembly: {e}")
-        sys.exit(1)
+# Define the output file names
+stage1_output = os.path.join(staging_dir, 'stage1.bin')
+stage2_output = os.path.join(staging_dir, 'stage2.bin')
+kernel_output = os.path.join(staging_dir, 'kernel.bin')
 
-def write_directory(fs, path, start_cluster, cluster_map, sector_size, reserved_sectors):
-    """Writes a directory structure into the FAT32 filesystem."""
-    dir_entry_size = 32
-    cluster_start = reserved_sectors * sector_size + start_cluster * sector_size
-    cluster_map[start_cluster] = 0x0FFFFFFF  # Mark this cluster as EOF
+# Ensure the build directory exists
+def setup_build_dir():
+    if not os.path.exists(staging_dir):
+        os.makedirs(staging_dir)
 
-    fs.seek(cluster_start)
-    for item in os.listdir(path):
-        item_path = os.path.join(path, item)
-        attr = 0x10 if os.path.isdir(item_path) else 0x20
-        cluster = len(cluster_map)
-        cluster_map[cluster] = 0x0FFFFFFF if attr == 0x10 else 0
+# Clean up build artifacts
+def clean_build_dir():
+    if os.path.exists(staging_dir):
+        shutil.rmtree(staging_dir)
 
-        # Write directory entry
-        name = item.upper().ljust(11, ' ')
-        fs.write(name.encode())            # File/Directory name
-        fs.write(pack("<B", attr))         # Attribute byte
-        fs.write(pack("<B", 0))            # Reserved
-        fs.write(pack("<B", 0))            # Create time (tenths of a second)
-        fs.write(pack("<H", 0))            # Create time
-        fs.write(pack("<H", 0))            # Create date
-        fs.write(pack("<H", 0))            # Last accessed date
-        fs.write(pack("<H", 0))            # High cluster
-        fs.write(pack("<H", 0))            # Write time
-        fs.write(pack("<H", 0))            # Write date
-        fs.write(pack("<H", cluster))      # Starting cluster
-        fs.write(pack("<I", 0))            # File size (0 for directories)
+# Compile the assembly files using NASM
+def compile_stage1():
+    print(f"Compiling Stage 1 bootloader: {stage1_file}")
+    subprocess.run(['nasm', '-f', 'bin', stage1_file, '-o', stage1_output])
 
-        # Write subdirectories recursively
-        if attr == 0x10:
-            write_directory(fs, item_path, cluster, cluster_map, sector_size, reserved_sectors)
+def compile_stage2():
+    print(f"Compiling Stage 2 bootloader: {stage2_file}")
+    subprocess.run(['nasm', '-f', 'bin', stage2_file, '-o', stage2_output])
 
-def create_fat32_filesystem(fs_image, root_dir):
-    """Creates a FAT32 filesystem with 'comrade_shared' as the root."""
-    print(f"Creating FAT32 filesystem {fs_image}...")
-    sector_size = 512
-    sectors_per_cluster = 1
-    reserved_sectors = 32
-    num_fats = 2
-    fat_size = 9  # Number of sectors per FAT
-    total_sectors = 2880  # 1.44MB floppy size for simplicity
+def compile_kernel():
+    print(f"Compiling Kernel: {kernel_file}")
+    subprocess.run(['nasm', '-f', 'bin', kernel_file, '-o', kernel_output])
 
-    # FAT32 creation logic
-    with open(fs_image, "wb") as fs:
-        fs.write(bytearray(total_sectors * sector_size))  # Blank disk image
+def create_boot_img():
+    print("Creating boot image...")
 
-    with open(fs_image, "r+b") as fs:
-        # Initialize FAT32 BPB and FATs as in the previous script
-        # ...
+    # Define the final boot image file
+    boot_img_file = os.path.join(staging_dir, 'boot.img')
 
-        # Write directories and files starting with "comrade_shared" as root
-        cluster_map = {}
-        write_directory(fs, root_dir, 2, cluster_map, sector_size, reserved_sectors)
+    # Concatenate stage1, stage2, and kernel into a single boot image
+    with open(boot_img_file, 'wb') as boot_img:
+        # Write stage1
+        with open(stage1_output.strip("\""), 'rb') as stage1:
+            boot_img.write(stage1.read())
 
-    print(f"FAT32 filesystem {fs_image} created with custom structure.")
+        # Write stage2
+        with open(stage2_output.strip("\""), 'rb') as stage2:
+            boot_img.write(stage2.read())
 
-def create_bootable_image(stage1_path, fs_image, output_image):
-    """Creates the final bootable image with stage1 at the boot sector."""
-    print(f"Creating bootable image {output_image}...")
-    with open(stage1_path, "rb") as stage1, open(fs_image, "rb") as fs, open(output_image, "wb") as bootable_image:
-        bootable_image.write(stage1.read())  # Write stage1 to boot sector
-        fs.seek(512)  # Skip stage1 boot sector
-        bootable_image.write(fs.read())  # Append the filesystem
+        # Write kernel
+        with open(kernel_output.strip("\""), 'rb') as kernel:
+            boot_img.write(kernel.read())
 
-    print(f"Bootable image {output_image} created.")
+    print(f"Boot image created at: {boot_img_file}")
+    return boot_img_file  # Return the boot image file path
 
-def clean_up():
-    """Cleans up build artifacts and temporary files."""
-    if os.path.exists("build"):
-        shutil.rmtree("build")
-        print("Cleaned up build artifacts.")
-    
-    if os.path.exists("comrade_shared"):
-        shutil.rmtree("comrade_shared")
-        print("Cleaned up temporary 'comrade_shared' directory.")
+def run_qemu(boot_img_file):
+    print(f"Running QEMU with boot image: {boot_img_file}")
+    subprocess.run(['qemu-system-x86_64', '-drive', f'file={boot_img_file},format=raw'])
 
+# Main build function
+def build(run=False):
+    setup_build_dir()
+
+    print("Starting build process...")
+    compile_stage1()
+    compile_stage2()
+    compile_kernel()
+    boot_img_file = create_boot_img()
+
+    print("Build completed successfully.")
+
+    # If 'run' is True, start QEMU
+    if run:
+        run_qemu(boot_img_file)
+
+# Main clean function
+def clean():
+    print("Cleaning up build artifacts...")
+    clean_build_dir()
+    print("Cleanup completed.")
+
+# Command-line interface for user input
 def main():
-    # Ask user for configuration option
-    print("Choose an option:")
-    print("1: Build the project")
-    print("2: Clean the build artifacts")
-    option = input("Enter your choice (1 or 2): ")
+    choice = input("Enter command (build/clean): ").strip().lower()
 
-    if option == "1":
-        create_directories()
-
-        stage1_source = "JosephStalin/stage1.asm"
-        stage2_source = "JosephStalin/stage2.asm"
-        kernel_source = "KGB/entry.asm"
-
-        stage1_output = "build/stage1.bin"
-        stage2_output = "build/stage2.bin"
-        kernel_output = "build/kgb.bin"
-        fs_image = "build/filesystem.img"
-        output_image = "build/bootable_image.img"
-
-        # Assemble the bootloaders and kernel
-        assemble_source(stage1_source, stage1_output)
-        assemble_source(stage2_source, stage2_output)
-        assemble_source(kernel_source, kernel_output)
-
-        # Create the filesystem
-        root_dir = "comrade_shared"
-        if not os.path.exists(root_dir):
-            os.makedirs(root_dir)
-
-        # Populate filesystem with files
-        os.makedirs(f"{root_dir}/red_bureau", exist_ok=True)
-        os.makedirs(f"{root_dir}/data", exist_ok=True)
-        with open(f"{root_dir}/red_bureau/stage2.bin", "wb") as f:
-            f.write(open(stage2_output, "rb").read())
-        with open(f"{root_dir}/red_bureau/kgb.bin", "wb") as f:
-            f.write(open(kernel_output, "rb").read())
-
-        create_fat32_filesystem(fs_image, root_dir)
-
-        # Create the final bootable image
-        create_bootable_image(stage1_output, fs_image, output_image)
-
-        print("Build complete. Bootable image is ready!")
-
-        # Clean up temporary files and directories
-        clean_up()
-
-    elif option == "2":
-        clean_up()
+    if choice == "build":
+        run_choice = input("Do you want to run QEMU after build? (yes/no): ").strip().lower()
+        build(run=(run_choice == 'yes'))
+    elif choice == "clean":
+        clean()
     else:
-        print("Invalid option. Please choose 1 or 2.")
+        print("Invalid command. Please use 'build' or 'clean'.")
 
 if __name__ == "__main__":
     main()
