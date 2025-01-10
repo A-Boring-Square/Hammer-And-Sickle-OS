@@ -8,7 +8,7 @@ Features:
 
 *   **Bootloader (`JosephStalin`)**: A multi-stage bootloader that sets up the system and loads the kernel.
 *   **Kernel (`The KGB`)**: The core of the OS, written in pure assembly, responsible for managing system resources.
-*   **Filesystem**: A FAT32 filesystem with a custom directory layout, created and managed using assembly language.
+*   **Filesystem**: A EXT4 filesystem with a custom directory layout, created and managed using assembly language.
 *   **Cross-platform build system**: The build process is automated using a Python script, which uses NASM to assemble the components and create the final bootable image.
 *   **Soviet-Themed**: A playful reference to the USSR, with directories named `comrade_shared` and `red_bureau`.
 
