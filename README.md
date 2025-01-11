@@ -21,8 +21,9 @@ Installation:
         cd Hammer-And-Sickle-OS
     
 2.  Install dependencies:
-    *   **NASM**: You will need NASM (Netwide Assembler) to assemble the bootloader and kernel.
-    *   **python**: You need python version 3.x.x to run the build scripts
+    *   **NASM**: You will need NASM (Netwide Assembler) to assemble the OS
+    *   **python**: You need python version 3.X.X to run the build scripts
+    *   **A VM**: Not required but strongly recomended as it suports runing QEMU after building
 3.  Build the project:
     
         python Build.py

@@ -1,12 +1,10 @@
 import os
 import subprocess
 import shutil
-import platform
+import struct
 
 # Directories for the bootloaders and kernel
 staging_dir = 'build_temp'
-
-# Directories for the bootloaders and kernel
 bootloader_dir = 'JosephStalin'
 kernel_dir = 'KGB'
 
@@ -19,86 +17,131 @@ kernel_file = os.path.join(kernel_dir, 'entry.asm')
 stage1_output = os.path.join(staging_dir, 'stage1.bin')
 stage2_output = os.path.join(staging_dir, 'stage2.bin')
 kernel_output = os.path.join(staging_dir, 'kernel.bin')
+boot_img_file = os.path.join(staging_dir, 'boot.img')
 
-# Ensure the build directory exists
+# FAT32 parameters
+SECTOR_SIZE = 512
+FAT_SECTORS = 2
+ROOT_DIR_SECTORS = 32
+DATA_SECTORS = 100
+TOTAL_SECTORS = 1 + FAT_SECTORS + ROOT_DIR_SECTORS + DATA_SECTORS
+
 def setup_build_dir():
     if not os.path.exists(staging_dir):
         os.makedirs(staging_dir)
 
-# Clean up build artifacts
 def clean_build_dir():
     if os.path.exists(staging_dir):
         shutil.rmtree(staging_dir)
 
-# Compile the assembly files using NASM
 def compile_stage1():
     print(f"Compiling Stage 1 bootloader: {stage1_file}")
-    subprocess.run(['nasm', '-f', 'bin', stage1_file, '-o', stage1_output])
+    subprocess.run(['nasm', '-f', 'bin', stage1_file, '-o', stage1_output], check=True)
 
 def compile_stage2():
     print(f"Compiling Stage 2 bootloader: {stage2_file}")
-    subprocess.run(['nasm', '-f', 'bin', stage2_file, '-o', stage2_output])
+    subprocess.run(['nasm', '-f', 'bin', stage2_file, '-o', stage2_output], check=True)
 
 def compile_kernel():
     print(f"Compiling Kernel: {kernel_file}")
-    subprocess.run(['nasm', '-f', 'bin', kernel_file, '-o', kernel_output])
+    subprocess.run(['nasm', '-f', 'bin', kernel_file, '-o', kernel_output], check=True)
+
+def create_fat32_filesystem(output_file):
+    print("Creating FAT32 filesystem...")
+    
+    # Boot sector
+    boot_sector = bytearray(SECTOR_SIZE)
+    boot_sector[0x00:0x03] = b'\xEB\x58\x90'  # JMP instruction
+    boot_sector[0x03:0x0B] = b'MSDOS5.0'      # OEM Name
+    struct.pack_into('<H', boot_sector, 0x0B, SECTOR_SIZE)  # Bytes per sector
+    boot_sector[0x0D] = 1  # Sectors per cluster
+    struct.pack_into('<H', boot_sector, 0x0E, 1)  # Reserved sectors
+    boot_sector[0x10] = 2  # Number of FATs
+    struct.pack_into('<H', boot_sector, 0x11, 16)  # Max root dir entries
+    struct.pack_into('<H', boot_sector, 0x13, TOTAL_SECTORS)  # Total sectors (small)
+    boot_sector[0x15] = 0xF8  # Media descriptor
+    struct.pack_into('<H', boot_sector, 0x16, FAT_SECTORS)  # Sectors per FAT
+    struct.pack_into('<H', boot_sector, 0x1A, 1)  # Hidden sectors
+    boot_sector[0x1FE:0x200] = b'\x55\xAA'  # Boot sector signature
+
+    # FAT table
+    fat_table = bytearray(SECTOR_SIZE * FAT_SECTORS)
+    fat_table[0:3] = b'\xF8\xFF\xFF'  # Reserved cluster entries
+
+    # Root directory
+    root_dir = bytearray(SECTOR_SIZE * ROOT_DIR_SECTORS)
+
+    # Add 'comrade_shared' directory entry
+    add_directory_entry(root_dir, "COMRADE SHARED", 2)
+
+    # Add 'red_bureau' directory entry
+    add_directory_entry(root_dir, "RED BUREAU", 3)
+
+    # Write the filesystem to the output file
+    with open(output_file, 'wb') as fs:
+        fs.write(boot_sector)
+        fs.write(fat_table)
+        fs.write(fat_table)  # FAT2 (identical to FAT1)
+        fs.write(root_dir)
+        fs.write(bytearray(SECTOR_SIZE * DATA_SECTORS))  # Empty data region
+
+    print(f"FAT32 filesystem with 'comrade_shared' and 'red_bureau' directories created at: {output_file}")
+
+def add_directory_entry(root_dir, name, cluster):
+    """Add a directory entry to the root directory."""
+    dir_name = name.ljust(11)  # Pad to 11 characters
+    dir_entry = bytearray(32)
+    dir_entry[0x00:0x0B] = dir_name.encode('ascii')  # Directory name
+    dir_entry[0x0B] = 0x10  # Attribute: Directory
+    struct.pack_into('<H', dir_entry, 0x1A, cluster)  # First cluster
+    struct.pack_into('<I', dir_entry, 0x1C, 0)  # File size (directories have size 0)
+
+    # Find the first empty slot in the root directory
+    for i in range(0, len(root_dir), 32):
+        if root_dir[i] == 0x00:  # Empty slot
+            root_dir[i:i + 32] = dir_entry
+            break
 
 def create_boot_img():
     print("Creating boot image...")
 
-    # Define the final boot image file
-    boot_img_file = os.path.join(staging_dir, 'boot.img')
-
     # Concatenate stage1, stage2, and kernel into a single boot image
     with open(boot_img_file, 'wb') as boot_img:
         # Write stage1
-        with open(stage1_output.strip("\""), 'rb') as stage1:
+        with open(stage1_output, 'rb') as stage1:
             boot_img.write(stage1.read())
 
         # Write stage2
-        with open(stage2_output.strip("\""), 'rb') as stage2:
+        with open(stage2_output, 'rb') as stage2:
             boot_img.write(stage2.read())
 
         # Write kernel
-        with open(kernel_output.strip("\""), 'rb') as kernel:
+        with open(kernel_output, 'rb') as kernel:
             boot_img.write(kernel.read())
 
+        # Create and append FAT32 filesystem
+        create_fat32_filesystem(boot_img_file)
+
     print(f"Boot image created at: {boot_img_file}")
-    return boot_img_file  # Return the boot image file path
 
-def run_qemu(boot_img_file):
-    print(f"Running QEMU with boot image: {boot_img_file}")
-    subprocess.run(['qemu-system-x86_64', '-drive', f'file={boot_img_file},format=raw'])
-
-# Main build function
-def build(run=False):
+def build():
     setup_build_dir()
-
     print("Starting build process...")
     compile_stage1()
     compile_stage2()
     compile_kernel()
-    boot_img_file = create_boot_img()
-
+    create_boot_img()
     print("Build completed successfully.")
 
-    # If 'run' is True, start QEMU
-    if run:
-        run_qemu(boot_img_file)
-
-# Main clean function
 def clean():
     print("Cleaning up build artifacts...")
     clean_build_dir()
     print("Cleanup completed.")
 
-# Command-line interface for user input
 def main():
     choice = input("Enter command (build/clean): ").strip().lower()
-
     if choice == "build":
-        run_choice = input("Do you want to run QEMU after build? (yes/no): ").strip().lower()
-        build(run=(run_choice == 'yes'))
+        build()
     elif choice == "clean":
         clean()
     else:
