@@ -101,7 +101,6 @@ random_number:
 wait_10_seconds:
     ; Wait by reading the system timer and introducing a delay
     ; This will make a simple loop that counts for about 10 seconds.
-    ; It uses the BIOS timer interrupt for simplicity.
     mov cx, 0xFFFF       ; Use a large loop for delay (approx 10 seconds)
 wait_loop:
     nop                  ; No operation (do nothing)

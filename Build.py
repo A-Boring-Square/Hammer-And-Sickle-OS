@@ -57,11 +57,11 @@ def create_fat32_filesystem(output_file):
     boot_sector[0x0D] = 1  # Sectors per cluster
     struct.pack_into('<H', boot_sector, 0x0E, 1)  # Reserved sectors
     boot_sector[0x10] = 2  # Number of FATs
-    struct.pack_into('<H', boot_sector, 0x11, 16)  # Max root dir entries
-    struct.pack_into('<H', boot_sector, 0x13, TOTAL_SECTORS)  # Total sectors (small)
+    struct.pack_into('<H', boot_sector, 0x11, 0)  # Max root dir entries (FAT32 uses data cluster)
+    struct.pack_into('<I', boot_sector, 0x20, TOTAL_SECTORS)  # Total sectors
     boot_sector[0x15] = 0xF8  # Media descriptor
-    struct.pack_into('<H', boot_sector, 0x16, FAT_SECTORS)  # Sectors per FAT
-    struct.pack_into('<H', boot_sector, 0x1A, 1)  # Hidden sectors
+    struct.pack_into('<I', boot_sector, 0x24, FAT_SECTORS)  # Sectors per FAT
+    struct.pack_into('<I', boot_sector, 0x2C, 2)  # First data cluster
     boot_sector[0x1FE:0x200] = b'\x55\xAA'  # Boot sector signature
 
     # FAT table
@@ -70,12 +70,13 @@ def create_fat32_filesystem(output_file):
 
     # Root directory
     root_dir = bytearray(SECTOR_SIZE * ROOT_DIR_SECTORS)
+    root_cluster = bytearray(SECTOR_SIZE)
 
     # Add 'comrade_shared' directory entry
-    add_directory_entry(root_dir, "COMRADE SHARED", 2)
+    add_directory_entry(root_cluster, "COMRADE SHARED", 2)
 
     # Add 'red_bureau' directory entry
-    add_directory_entry(root_dir, "RED BUREAU", 3)
+    add_directory_entry(root_cluster, "RED BUREAU", 3)
 
     # Write the filesystem to the output file
     with open(output_file, 'wb') as fs:
@@ -83,23 +84,24 @@ def create_fat32_filesystem(output_file):
         fs.write(fat_table)
         fs.write(fat_table)  # FAT2 (identical to FAT1)
         fs.write(root_dir)
+        fs.write(root_cluster)  # Empty directory space
         fs.write(bytearray(SECTOR_SIZE * DATA_SECTORS))  # Empty data region
 
     print(f"FAT32 filesystem with 'comrade_shared' and 'red_bureau' directories created at: {output_file}")
 
-def add_directory_entry(root_dir, name, cluster):
-    """Add a directory entry to the root directory."""
+def add_directory_entry(cluster, name, cluster_number):
+    """Add a directory entry to a cluster."""
     dir_name = name.ljust(11)  # Pad to 11 characters
     dir_entry = bytearray(32)
     dir_entry[0x00:0x0B] = dir_name.encode('ascii')  # Directory name
     dir_entry[0x0B] = 0x10  # Attribute: Directory
-    struct.pack_into('<H', dir_entry, 0x1A, cluster)  # First cluster
+    struct.pack_into('<H', dir_entry, 0x1A, cluster_number)  # First cluster
     struct.pack_into('<I', dir_entry, 0x1C, 0)  # File size (directories have size 0)
 
-    # Find the first empty slot in the root directory
-    for i in range(0, len(root_dir), 32):
-        if root_dir[i] == 0x00:  # Empty slot
-            root_dir[i:i + 32] = dir_entry
+    # Add to cluster
+    for i in range(0, len(cluster), 32):
+        if cluster[i] == 0x00:  # Empty slot
+            cluster[i:i + 32] = dir_entry
             break
 
 def create_boot_img():
