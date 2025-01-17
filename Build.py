@@ -3,15 +3,16 @@ import subprocess
 import shutil
 import struct
 
-# Directories for the bootloaders and kernel
+# Directories for the bootloaders, kernel, and Klib
 staging_dir = 'build_temp'
 bootloader_dir = 'JosephStalin'
 kernel_dir = 'KGB'
+klib_dir = 'Klib'
 
 # Define file names for the bootloaders
 stage1_file = os.path.join(bootloader_dir, 'stage1.asm')
 stage2_file = os.path.join(bootloader_dir, 'stage2.asm')
-kernel_file = os.path.join(kernel_dir, 'entry.asm')
+kernel_file = os.path.join(kernel_dir, 'kernel.c')  # C file for the kernel
 
 # Define the output file names
 stage1_output = os.path.join(staging_dir, 'stage1.bin')
@@ -44,7 +45,21 @@ def compile_stage2():
 
 def compile_kernel():
     print(f"Compiling Kernel: {kernel_file}")
-    subprocess.run(['nasm', '-f', 'bin', kernel_file, '-o', kernel_output], check=True)
+    # Use gcc with the flags for x86_64
+    subprocess.run([
+        'gcc', '-fno-pie', '-fno-stack-protector', '-nostdlib', '-ffreestanding',
+        '-m64', '-march=x86-64', '-o', kernel_output, kernel_file
+    ], check=True)
+
+def compile_c_file(c_file, output_file):
+    """
+    Compiles a C file with the specified output file and adds include path to the 'Klib' folder.
+    """
+    print(f"Compiling C file: {c_file}")
+    subprocess.run([
+        'gcc', '-fno-pie', '-fno-stack-protector', '-nostdlib', '-ffreestanding',
+        '-m64', '-march=x86-64', '-I', klib_dir, '-o', output_file, c_file
+    ], check=True)
 
 def create_fat32_filesystem(output_file):
     print("Creating FAT32 filesystem...")
@@ -126,6 +141,12 @@ def create_boot_img():
 
     print(f"Boot image created at: {boot_img_file}")
 
+def run_qemu():
+    print("Running QEMU...")
+    subprocess.run([
+        'qemu-system-x86_64', '-drive', 'file=build_temp/boot.img,format=raw', '-m', '512'
+    ], check=True)
+
 def build():
     setup_build_dir()
     print("Starting build process...")
@@ -134,6 +155,12 @@ def build():
     compile_kernel()
     create_boot_img()
     print("Build completed successfully.")
+    
+    # Ask if user wants to run QEMU
+    choice = input("Do you want to run the kernel in QEMU? (y/n): ").strip().lower()
+    if choice == 'y':
+        run_qemu()
+
 
 def clean():
     print("Cleaning up build artifacts...")
