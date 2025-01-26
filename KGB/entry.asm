@@ -1,9 +1,11 @@
-; Entrypoint of the kernel the OS starts runing here
+; Entrypoint of the kernel. The OS starts running here.
 
-global _start
+global start_kernel
+
 extern K_MAIN
 
-_start:
+section .text
 
-    ; Call the K_MAIN function defined in kernal.c
-    call K_MAIN
+start_kernel:
+    call K_MAIN      ; Call the kernel's main function
+    hlt              ; Halt the CPU to prevent unexpected behavior

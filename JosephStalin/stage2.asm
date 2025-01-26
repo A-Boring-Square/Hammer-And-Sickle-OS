@@ -2,7 +2,6 @@
 ;
 ; sets up the cpu for 64 bit mode and inits the kernel
 [BITS 16]
-[ORG 0x1000]            ; Stage 2 bootloader starts at 0x1000
 
 start:
     ; Set up the CPU for 32-bit protected mode

@@ -26,9 +26,7 @@ Installation:
     *   **python**: You need python version 3.X.X to run the build scripts
     *   **gcc**: For building higher level things because Assembly is physically painful to code in
     *   **A VM**: Not required but strongly recomended as it suports runing QEMU after building
-3.  Build the project:
-    
-        python Build.py
+3.  Build the project using `make` **NOTE**: on Windows you need to build ith with WSL (Windows Subsystem For Linux)
 
 Project Structure:
 ------------------
@@ -39,7 +37,7 @@ Project Structure:
     │   └── stage2.asm
     ├── KGB
         ├── entry.asm
-        └── kernel.zig
+        └── kernel.c
 
 Contributing:
 -------------
