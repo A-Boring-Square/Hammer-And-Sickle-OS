@@ -15,24 +15,26 @@ START:
     mov ss, ax           ; Set the stack segment
     mov sp, 0x7C00       ; Set the stack pointer to the bottom of memory
 
+    
+
     ; Print random sentence
     call print_random_sentence
 
     ; Wait for 10 seconds
     call wait_10_seconds
 
-    ; Load stage2 (next bootloader or kernel) into memory at 0x1000
+    ; Load stage2 (next bootload) into memory at 0x1000
     mov ah, 0x02         ; BIOS read sector function
     mov al, 1            ; Read 1 sector
     mov ch, 0            ; Cylinder 0
-    mov cl, 2            ; Sector 2 (stage2 binary is assumed to be here)
+    mov cl, 2            ; Sector 2
     mov dh, 0            ; Head 0
     mov dl, 0x80         ; Disk 0 (first floppy disk or first hard disk)
     lea bx, [0x1000]     ; Load to 0x1000 (next bootloader location)
     int 0x13             ; BIOS interrupt to read sector
 
     ; Jump to Stage 2 bootloader (start executing it)
-    jmp 0x1000           ; Jump to the start of stage2 in memory
+    jmp 0x10000           ; Jump to the start of stage2 in memory
 
 ; Print random sentence function
 print_random_sentence:

@@ -1,64 +1,50 @@
-CC      := gcc
-ASMBLR  := nasm
-LD      := ld
-OBJCOPY := objcopy
+CC     := gcc
+ASMBLR := nasm
 
-# Directories
 SRC_DIR  := KGB
-KLIB_DIR := Klib
 OBJ_DIR  := obj
 BIN_DIR  := bin
 BOOT_DIR := JosephStalin
+SRC := $(shell find $(SRC_DIR) -name '*.c')
+ASM := $(SRC_DIR)/entry.asm
+OBJ := $(patsubst $(SRC_DIR)/%.c, $(OBJ_DIR)/%.o, $(SRC)) \
+	   $(patsubst $(SRC_DIR)/%.asm, $(OBJ_DIR)/asm/%.o, $(ASM))
 
-# Files
-ASM_SRC := $(SRC_DIR)/entry.asm
-C_SRC   := $(KLIB_DIR)/Drivers/VGA/vga_driver.c \
-           $(KLIB_DIR)/Drivers/IO/Input.c \
-           $(KLIB_DIR)/Drivers/IO/Output.c
-ASM_OBJ := $(OBJ_DIR)/entry.o
-C_OBJ   := $(patsubst $(KLIB_DIR)/%.c, $(OBJ_DIR)/%.o, $(C_SRC))
-LINKER_SCRIPT := $(SRC_DIR)/link.ld
-KERNEL_TMP := $(BIN_DIR)/kernel.tmp
-KERNEL_BIN := $(BIN_DIR)/kernel.bin
-STAGE1_BIN := $(BIN_DIR)/stage1.bin
-STAGE2_BIN := $(BIN_DIR)/stage2.bin
+CFLAGS = -I$(SRC_DIR)
 
-# Flags
-CFLAGS  := -ffreestanding -nostdlib -nostartfiles -m64 -I$(KLIB_DIR)
-ASFLAGS := -f elf64
-LDFLAGS := -T $(LINKER_SCRIPT)
+# Generate OS binary and start the qemu virtual machine
+all: $(BIN_DIR)/OS.bin run_qemu
 
-# Default target
-all: $(KERNEL_BIN)
+# Concatenate all binary into single OS.bin.
+# boot.bin has the bootloader
+# full_kernel.bin has the actual kernel + kernel_entry
 
-# Kernel binary
-$(KERNEL_BIN): $(ASM_OBJ) $(C_OBJ)
-	mkdir -p $(BIN_DIR)
-	$(LD) -o $(KERNEL_TMP) $(ASM_OBJ) $(C_OBJ) $(LDFLAGS)
-	$(OBJCOPY) -O binary $(KERNEL_TMP) $@
+$(BIN_DIR)/OS.bin: $(BIN_DIR)/stage1.bin $(BIN_DIR)/stage2.bin $(BIN_DIR)/full_kernel.bin
+	cat $(BIN_DIR)/stage1.bin $(BIN_DIR)/stage2.bin $(BIN_DIR)/full_kernel.bin > $@
 
-# Assembly object files
-$(OBJ_DIR)/%.o: $(SRC_DIR)/%.asm
-	mkdir -p $(OBJ_DIR)
-	$(ASMBLR) $(ASFLAGS) $< -o $@
+$(BIN_DIR)/stage1.bin: $(BOOT_DIR)/stage1.asm
+	$(ASMBLR) -f bin $< -o $@ -i $(BOOT_DIR)
 
-# C object files
-$(OBJ_DIR)/%.o: $(KLIB_DIR)/%.c
-	mkdir -p $(OBJ_DIR)/Drivers/IO
-	mkdir -p $(OBJ_DIR)/Drivers/VGA
-	$(CC) $(CFLAGS) -c $< -o $@
+$(BIN_DIR)/stage2.bin: $(BOOT_DIR)/stage2.asm
+	$(ASMBLR) -f bin $< -o $@ -i $(BOOT_DIR)
 
-# Stage 1 bootloader
-$(STAGE1_BIN): $(BOOT_DIR)/stage1.asm
-	mkdir -p $(BIN_DIR)
-	$(ASMBLR) -f bin $< -o $@
+$(BIN_DIR)/full_kernel.bin: $(OBJ)
+	ld -m elf_i386 -o $@ -Tlink.ld $(OBJ) --oformat binary
 
-# Stage 2 bootloader
-$(STAGE2_BIN): $(BOOT_DIR)/stage2.asm
-	mkdir -p $(BIN_DIR)
-	$(ASMBLR) -f bin $< -o $@
 
-# Clean build artifacts
+$(OBJ_DIR)/%.o: $(SRC_DIR)/%.c
+	mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) -fno-pie -fno-stack-protector -ffreestanding -m32 -march=i386 -c $< -o $@
+
+$(OBJ_DIR)/asm/%.o: $(SRC_DIR)/%.asm
+	mkdir -p $(dir $@)
+	$(ASMBLR) -f elf $< -o $@ -i $(SRC_DIR)
+
+run_qemu:
+	qemu-system-x86_64 -drive format=raw,file="$(BIN_DIR)/OS.bin",index=0,if=floppy,  -m 128M
+	#qemu-system-x86_64 -drive format=raw,file="$(BIN_DIR)/OS.bin",index=0,if=floppy, -drive format=raw,file=disk.img,
+
 clean:
 	rm -rf $(OBJ_DIR)/*
 	rm -rf $(BIN_DIR)/*
+

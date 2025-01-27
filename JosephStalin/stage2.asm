@@ -2,11 +2,13 @@
 ;
 ; sets up the cpu for 64 bit mode and inits the kernel
 [BITS 16]
-
+[ORG 0x1000]
 start:
+    
+
     ; Set up the CPU for 32-bit protected mode
     cli                      ; Disable interrupts
-    mov ax, 0x0001           ; Load selector for protected mode
+    mov ax, 0x48           ; Load selector for protected mode
     mov ds, ax 
     mov es, ax
     mov fs, ax
@@ -44,6 +46,8 @@ long_mode:
     ; Now the CPU is in 64-bit mode
     ; Set the address for the kernel's entry point
     mov rsi, 0x10000
+
+    
 
     ; Jump to the kernel entry point
     jmp rsi                  ; Jump to the kernel's entry point
