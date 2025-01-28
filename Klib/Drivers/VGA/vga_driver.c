@@ -1,12 +1,9 @@
 #include "vga_driver.h"
 
-static vga_entry_t* const video_memory = (vga_entry_t*)VIDEO_MEMORY;
+static vga_entry_t* const video_memory = VIDEO_MEMORY;
 static unsigned int cursor_x = 0;
 static unsigned int cursor_y = 0;
 
-static inline void outb(unsigned short port, unsigned char val) {
-    __asm__ volatile ("outb %0, %1" : : "a" (val), "d" (port));
-}
 
 static void update_cursor() {
     unsigned short pos = cursor_y * VGA_WIDTH + cursor_x;

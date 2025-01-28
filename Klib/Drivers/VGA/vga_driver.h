@@ -1,4 +1,5 @@
 #ifndef K_LIB_DRIVERS_VGA_H
+#include "../../common.h"
 
 #define K_LIB_DRIVERS_VGA_H
 #define VIDEO_MEMORY (char*)0xB8000
@@ -27,7 +28,6 @@ typedef struct {
     unsigned char attribute;
 } vga_entry_t;
 
-static inline void outb(unsigned short port, unsigned char val);
 
 void clear_screen(unsigned char attribute);
 void put_char(char c, unsigned char attribute);
