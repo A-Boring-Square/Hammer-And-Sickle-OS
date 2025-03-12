@@ -1,16 +1,17 @@
 CC     := gcc
 ASMBLR := nasm
 
-SRC_DIR  := KGB
+SRC_DIR  := .
 OBJ_DIR  := obj
 BIN_DIR  := bin
 BOOT_DIR := JosephStalin
 SRC := $(shell find $(SRC_DIR) -name '*.c')
-ASM := $(SRC_DIR)/entry.asm
+ASM := $(SRC_DIR)/KGB/entry.asm
 OBJ := $(patsubst $(SRC_DIR)/%.c, $(OBJ_DIR)/%.o, $(SRC)) \
-	   $(patsubst $(SRC_DIR)/%.asm, $(OBJ_DIR)/asm/%.o, $(ASM))
+       $(patsubst $(SRC_DIR)/%.asm, $(OBJ_DIR)/asm/%.o, $(ASM))
 
-CFLAGS = -I$(SRC_DIR)
+CFLAGS = -I$(SRC_DIR) -m32
+ASMFLAGS = -f elf_i386
 
 # Generate OS binary and start the qemu virtual machine
 all: $(BIN_DIR)/OS.bin run_qemu
@@ -34,11 +35,11 @@ $(BIN_DIR)/full_kernel.bin: $(OBJ)
 
 $(OBJ_DIR)/%.o: $(SRC_DIR)/%.c
 	mkdir -p $(dir $@)
-	$(CC) $(CFLAGS) -fno-pie -fno-stack-protector -ffreestanding -m32 -march=i386 -c $< -o $@
+	$(CC) $(CFLAGS) -fno-pie -fno-stack-protector -ffreestanding -c $< -o $@
 
 $(OBJ_DIR)/asm/%.o: $(SRC_DIR)/%.asm
 	mkdir -p $(dir $@)
-	$(ASMBLR) -f elf $< -o $@ -i $(SRC_DIR)
+	$(ASMBLR) $(ASMFLAGS) $< -o $@ -i $(SRC_DIR)
 
 run_qemu:
 	qemu-system-x86_64 -drive format=raw,file="$(BIN_DIR)/OS.bin",index=0,if=floppy,  -m 128M
@@ -47,4 +48,3 @@ run_qemu:
 clean:
 	rm -rf $(OBJ_DIR)/*
 	rm -rf $(BIN_DIR)/*
-

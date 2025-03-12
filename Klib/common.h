@@ -2,6 +2,13 @@
 #ifndef K_LIB_COMMON_H
 #define K_LIB_COMMON_H
 
+// data types
+typedef unsigned char  uint8_t;
+typedef unsigned short uint16_t;
+typedef unsigned int   uint32_t;
+typedef unsigned long  uint64_t;
+
+
 // boolean values
 #define true 1
 #define false 0

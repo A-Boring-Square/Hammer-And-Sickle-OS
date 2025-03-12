@@ -1,8 +1,8 @@
 #ifndef K_LIB_DRIVERS_VGA_H
-#include "../../common.h"
+
 
 #define K_LIB_DRIVERS_VGA_H
-#define VIDEO_MEMORY (char*)0xB8000
+#define VIDEO_MEMORY ((vga_entry_t*)0xFFFFFFFF800B8000)
 #define VGA_WIDTH    80
 #define VGA_HEIGHT   25
 

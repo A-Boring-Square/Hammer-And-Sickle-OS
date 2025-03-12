@@ -1,9 +1,10 @@
+#include "../../common.h"
 #include "vga_driver.h"
 
-static vga_entry_t* const video_memory = VIDEO_MEMORY;
+
+volatile vga_entry_t* const video_memory = (volatile vga_entry_t*)VIDEO_MEMORY;  // New higher-half video memory
 static unsigned int cursor_x = 0;
 static unsigned int cursor_y = 0;
-
 
 static void update_cursor() {
     unsigned short pos = cursor_y * VGA_WIDTH + cursor_x;
